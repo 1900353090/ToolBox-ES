@@ -17,8 +17,11 @@ import org.elasticsearch.client.core.CountResponse;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.reindex.BulkByScrollResponse;
 import org.elasticsearch.index.reindex.UpdateByQueryRequest;
+import org.elasticsearch.script.Script;
+import org.elasticsearch.script.ScriptType;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +31,7 @@ import org.wcy.es.*;
 import org.wcy.es.module.base.BaseDoc;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * <p>Title : MyEsRestClient.java</p>
@@ -172,6 +172,43 @@ public class MyEsRestClient<T> {
             e.printStackTrace();
         }
         return bulkByScrollResponse;
+    }
+
+    /**
+     * 单条修改
+     * @author 王晨阳
+     * @lastUpdaterAuthor 王晨阳
+     * @date 2021/4/6-18:56
+     * @version 0.0.1
+     */
+    public UpdateResponse updateById(Object object){
+        if(Objects.isNull(object)) {
+            throw new NullPointerException("paramter is null");
+        }
+        Class<?> c = object.getClass();
+        c.getAnnotation();
+
+        //构建搜索条件源
+        QueryBuilder queryBuilders = QueryBuilders.boolQuery()
+                .must(
+                        QueryBuilders.termQuery("id", cargoDoc.getCarId())
+                );
+        Map<String,Object> map = new HashMap<>();
+        map.put("menuHomeIds",menuHomeIds);
+        new Script(ScriptType.INLINE,"painless","ctx._source.menuHomeIds=params.menuHomeIds", map);
+        EsUpdateQueryParam updateQueryParam =
+                new EsUpdateQueryParam(, SearchEsConstant.IndexName.PRODUCT);
+
+
+        UpdateRequest updateRequest = EsRequest.buildUpdateRequest(updateParam);
+        updateRequest.doc(updateParam.getJsonStr(), XContentType.JSON);
+        UpdateResponse update =null;
+        try {
+            update = restHighLevelClient.update(updateRequest, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return update;
     }
 
     /**
