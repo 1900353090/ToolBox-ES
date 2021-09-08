@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.search.SearchRequest;
@@ -26,11 +27,16 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.stereotype.Component;
 import org.wcy.es.*;
+import org.wcy.es.annotation.ESColumn;
 import org.wcy.es.module.base.BaseDoc;
-
+import org.springframework.lang.NonNull;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 
 /**
@@ -181,34 +187,28 @@ public class MyEsRestClient<T> {
      * @date 2021/4/6-18:56
      * @version 0.0.1
      */
-    public UpdateResponse updateById(Object object){
-        if(Objects.isNull(object)) {
-            throw new NullPointerException("paramter is null");
+    public BulkByScrollResponse updateById(Map<String,Object> paras, @NonNull String indexName, @NonNull String id){
+        if(StringUtils.isBlank(indexName)) {
+            throw new NullPointerException("indexName is null");
         }
-        Class<?> c = object.getClass();
-        c.getAnnotation();
-
+        if(StringUtils.isBlank(id)) {
+            throw new NullPointerException("id is null");
+        }
+        if(paras.isEmpty()) {
+            throw new NullPointerException("paras is null");
+        }
         //构建搜索条件源
         QueryBuilder queryBuilders = QueryBuilders.boolQuery()
                 .must(
-                        QueryBuilders.termQuery("id", cargoDoc.getCarId())
+                        QueryBuilders.termQuery("id", id)
                 );
-        Map<String,Object> map = new HashMap<>();
-        map.put("menuHomeIds",menuHomeIds);
-        new Script(ScriptType.INLINE,"painless","ctx._source.menuHomeIds=params.menuHomeIds", map);
-        EsUpdateQueryParam updateQueryParam =
-                new EsUpdateQueryParam(, SearchEsConstant.IndexName.PRODUCT);
-
-
-        UpdateRequest updateRequest = EsRequest.buildUpdateRequest(updateParam);
-        updateRequest.doc(updateParam.getJsonStr(), XContentType.JSON);
-        UpdateResponse update =null;
-        try {
-            update = restHighLevelClient.update(updateRequest, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            e.printStackTrace();
+        StringBuilder idOrCode = new StringBuilder();
+        for (String key:paras.keySet()) {
+            idOrCode.append("ctx._source.").append(key).append("=params.").append(key).append(";");
         }
-        return update;
+        Script painless = new Script(ScriptType.INLINE, "painless", idOrCode.toString(), paras);
+        EsUpdateQueryParam updateQueryParam = new EsUpdateQueryParam(painless, indexName);
+        return this.updateByQuery(updateQueryParam, queryBuilders);
     }
 
     /**
